@@ -32,7 +32,6 @@ namespace StandardizeAddress.Controllers
             }
             catch (Exception ex)
             {
-
                 _logger.LogError($"{ex.Message} {Environment.NewLine} {ex.StackTrace}");
                 return Problem();
             }
