@@ -21,10 +21,19 @@ namespace StandardizeAddress.BLL.Services
 
             _httpClient = httpClientFactory.CreateClient("Dadata");
 
-            _logger.LogTrace($"Http client has bee created with base url = {_httpClient.BaseAddress}");
+            _logger.LogTrace("Http client has bee created with base url = {BaseAddress}", _httpClient.BaseAddress);
         }
 
-        public async Task<string> CheckAdressAsync(string address, CancellationToken cancellationToken = default)
+        /// <summary>
+        ///  Send an address standardization request from a user to DaData service
+        /// </summary>
+        /// <param name="address">Input from user</param>
+        /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException">Thrown when the 'address' parameter is null or whitespace.</exception>
+        /// <exception cref="HttpRequestException">Thrown when there is an issue with the HTTP request to the DaData service.</exception>
+        /// <exception cref="JsonException">Thrown when there is an issue with the deserialization of the response.</exception>
+        public async Task<AddressInfoModel> CheckAdressAsync(string address, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(address))
             {
@@ -33,21 +42,28 @@ namespace StandardizeAddress.BLL.Services
 
             _logger.LogInformation("Send request to DaData service");
 
-            var response = await _httpClient.PostAsJsonAsync(string.Empty, new[] { address }, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.LogError($"Something wrong when fetching data : {response.StatusCode} {response.ReasonPhrase}");
+                var response = await _httpClient.PostAsJsonAsync(string.Empty, new[] { address }, cancellationToken);
+
+                response.EnsureSuccessStatusCode();
+
+                _logger.LogInformation("Request completed successfully. Read body response...");
+
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                AddressInfoModel responeObj = JsonSerializer.Deserialize<AddressInfoModel[]>(responseContent.ToString())?.FirstOrDefault()
+                                           ?? throw new JsonException("Something wrong during deserialization. Result is null");
+
+                _logger.LogInformation("Response has been received and read");
+
+                return responeObj;
             }
-
-            _logger.LogInformation("Request completed successfully. Read body response...");
-
-            // Обрабатываем ответ
-            var responseContent = await response.Content.ReadAsStringAsync();
-
-            AddressInfo[]? responeObj = JsonSerializer.Deserialize<AddressInfo[]>(responseContent.ToString());
-
-            return JsonSerializer.Serialize(responeObj);
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError("Something wrong when fetching data : {Message} {StatusCode} {ReasonPhrase}", ex.Message, ex.StatusCode, ex.StatusCode);
+                throw;
+            }
         }
     }
 }

@@ -27,16 +27,22 @@ namespace StandardizeAddress
             builder.Services.AddHttpClient("Dadata", client =>
             {
                 client.BaseAddress = new(builder.Configuration.GetSection("DadataBaseUrlForAddressApi").Value
-                             ?? throw new ArgumentNullException("Base address in appsettings file must be defined"));
+                             ?? throw new ArgumentNullException(nameof(builder.Configuration), "Base address in appsettings file must be defined"));
 
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                string dadataToken = builder.Configuration["DadataToken"] ?? throw new ArgumentNullException("DadataToken is not defined in appsettings file");
+                string dadataToken = builder.Configuration["DadataToken"]
+                                     ?? throw new ArgumentNullException(nameof(builder.Configuration), "DadataToken is not defined in appsettings file");
+
                 client.DefaultRequestHeaders.Add("Authorization", $"Token {dadataToken}"); // Устанавливаем API-ключ
 
-                string dadataSecret = builder.Configuration["DadataSecret"] ?? throw new ArgumentNullException("DadataSecret is not defined in appsettings file");
+                string dadataSecret = builder.Configuration["DadataSecret"]
+                                      ?? throw new ArgumentNullException(nameof(builder.Configuration), "DadataSecret is not defined in appsettings file");
+
                 client.DefaultRequestHeaders.Add("X-Secret", dadataSecret); // Устанавливаем секретный ключ
             });
+
+            builder.Services.AddAutoMapper(typeof(Program));
 
             var app = builder.Build();
 
@@ -51,6 +57,8 @@ namespace StandardizeAddress
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
+            app.UseCors(builder => builder.AllowAnyOrigin());
 
             app.Run();
         }
