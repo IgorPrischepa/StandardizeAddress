@@ -1,3 +1,7 @@
+﻿using Serilog;
+using StandardizeAddress.BLL.Extensions;
+using System.Net.Http.Headers;
+
 namespace StandardizeAddress
 {
     public class Program
@@ -6,9 +10,39 @@ namespace StandardizeAddress
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            //Logger
+
+            Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
+
+            builder.Host.UseSerilog();
+
             // Add services to the container.
 
             builder.Services.AddControllers();
+
+            builder.Services.AddServices();
+
+            builder.Services.AddSwaggerGen();
+
+            builder.Services.AddHttpClient("Dadata", client =>
+            {
+                client.BaseAddress = new(builder.Configuration.GetSection("DadataBaseUrlForAddressApi").Value
+                             ?? throw new ArgumentNullException(nameof(builder.Configuration), "Base address in appsettings file must be defined"));
+
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                string dadataToken = builder.Configuration["DadataToken"]
+                                     ?? throw new ArgumentNullException(nameof(builder.Configuration), "DadataToken is not defined in appsettings file");
+
+                client.DefaultRequestHeaders.Add("Authorization", $"Token {dadataToken}"); // Устанавливаем API-ключ
+
+                string dadataSecret = builder.Configuration["DadataSecret"]
+                                      ?? throw new ArgumentNullException(nameof(builder.Configuration), "DadataSecret is not defined in appsettings file");
+
+                client.DefaultRequestHeaders.Add("X-Secret", dadataSecret); // Устанавливаем секретный ключ
+            });
+
+            builder.Services.AddAutoMapper(typeof(Program));
 
             var app = builder.Build();
 
@@ -16,8 +50,15 @@ namespace StandardizeAddress
 
             app.UseAuthorization();
 
-
             app.MapControllers();
+
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseCors(builder => builder.AllowAnyOrigin());
 
             app.Run();
         }
